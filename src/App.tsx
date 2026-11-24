@@ -3,7 +3,7 @@ import {
   ArrowRight, CalendarDays, Check, Clock3, Eye, EyeOff, LogOut, Mail,
   ShieldCheck, UserRound, X,
 } from 'lucide-react'
-import Dashboard, { type AttendanceRow, type DashboardUser, type Shift, type Worker, type PropertyData, type HelpdeskTicket, type PropertyUnit } from './Dashboard'
+import Dashboard, { type AttendanceRow, type DashboardUser, type Shift, type Worker, type PropertyData, type HelpdeskTicket, type PropertyUnit, type ModuleItem } from './Dashboard'
 
 const API = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080').replace(/\/$/, '')
 type User = DashboardUser
@@ -15,7 +15,9 @@ async function call<T>(path: string, token?: string, init: RequestInit = {}): Pr
     headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: 'Bearer ' + token } : {}), ...init.headers },
   })
   const body = await response.json().catch(() => ({}))
-  if (!response.ok) throw Error(body.message || body.detail || body.error || 'Something went wrong. Please try again.')
+  if (response.status === 401) throw Error('Your session has expired. Sign out and sign in again.')
+  if (response.status === 404) throw Error(`API route ${path} was not found. Restart the API Gateway after rebuilding it.`)
+  if (!response.ok) throw Error(body.message || body.detail || body.error || `Request failed (${response.status}). Please try again.`)
   return body as T
 }
 
@@ -89,7 +91,8 @@ export default function App() {
   const [shift, setShift] = useState<Shift | null>(null)
   const [workers, setWorkers] = useState<Worker[]>([])
   const [selectedWorkerId, setSelectedWorkerId] = useState('')
-  const [page, setPage] = useState<'attendance' | 'workers' | 'property' | 'helpdesk'>('attendance')
+  const [page, setPage] = useState<'attendance' | 'workers' | 'property' | 'helpdesk' | 'work-orders' | 'assets' | 'inventory' | 'procurement' | 'hse' | 'amc' | 'iot'>('attendance')
+  const [moduleItems, setModuleItems] = useState<ModuleItem[]>([])
   const [property, setProperty] = useState<PropertyData | null>(null)
   const [tickets, setTickets] = useState<HelpdeskTicket[]>([])
   const [from, setFrom] = useState(iso(new Date(Date.now() - 30 * 86400000)))
@@ -124,6 +127,49 @@ export default function App() {
     catch (e) { setError(e instanceof Error ? e.message : 'Unable to load tickets.') }
   }, [token])
   useEffect(() => { void loadProperty(); void loadTickets() }, [loadProperty, loadTickets])
+
+  const moduleApi: Record<'work-orders' | 'assets' | 'inventory' | 'procurement' | 'hse' | 'amc' | 'iot', string> = { 'work-orders': '/api/work-orders', assets: '/api/assets', inventory: '/api/inventory', procurement: '/api/procurement', hse:'/api/safety', amc:'/api/contracts', iot:'/api/iot' }
+  const loadModule = useCallback(async () => {
+    if (!token || !Object.hasOwn(moduleApi,page)) { setModuleItems([]); return }
+    try {
+      if (page === 'hse') {
+        const [reports,inspections]=await Promise.all([call<ModuleItem[]>('/api/safety/reports',token),call<ModuleItem[]>('/api/safety/inspections',token)])
+        setModuleItems([...reports.map(row=>({...row,recordType:'report'})),...inspections.map(row=>({...row,recordType:'inspection'}))])
+      } else if (page === 'iot') {
+        const [devices,alerts]=await Promise.all([call<ModuleItem[]>('/api/iot/devices',token),call<ModuleItem[]>('/api/iot/alerts',token)])
+        setModuleItems([...devices.map(row=>({...row,recordType:'device'})),...alerts.map(row=>({...row,recordType:'alert'}))])
+      } else setModuleItems(await call<ModuleItem[]>(moduleApi[page as keyof typeof moduleApi], token))
+    }
+    catch (e) { setError(e instanceof Error ? e.message : `Unable to load ${page}.`) }
+  }, [token, page])
+  useEffect(() => { void loadModule() }, [loadModule])
+  async function createModuleItem(module: 'work-orders' | 'assets' | 'inventory' | 'procurement' | 'hse' | 'amc' | 'iot', item: ModuleItem) {
+    setBusy(true); setError('')
+    try {
+      const path = module === 'hse' ? `/api/safety/${item.recordType === 'inspection' ? 'inspections' : 'reports'}` : module === 'iot' ? '/api/iot/devices' : moduleApi[module]
+      const data={...item}; delete data.recordType
+      await call(path, token, { method: 'POST', body: JSON.stringify(data) })
+      setPage(module); setNotice('Record saved successfully.')
+      if(module==='hse'||module==='iot') { const [a,b]=await Promise.all([call<ModuleItem[]>(module==='hse'?'/api/safety/reports':'/api/iot/devices',token),call<ModuleItem[]>(module==='hse'?'/api/safety/inspections':'/api/iot/alerts',token)]);setModuleItems(module==='hse'?[...a.map(row=>({...row,recordType:'report'})),...b.map(row=>({...row,recordType:'inspection'}))]:[...a.map(row=>({...row,recordType:'device'})),...b.map(row=>({...row,recordType:'alert'}))]) }
+      else setModuleItems(await call<ModuleItem[]>(moduleApi[module], token))
+    } catch (e) { setError(e instanceof Error ? e.message : 'Unable to save record.') }
+    finally { setBusy(false) }
+  }
+  async function moduleAction(module:'hse'|'iot'|'amc',action:string,item:ModuleItem) {
+    const id=String(item.id||''); if(!id)return
+    setBusy(true);setError('')
+    try {
+      if(module==='hse'&&action==='review') await call(`/api/safety/reports/${id}/status`,token,{method:'PATCH',body:JSON.stringify({status:'Verified'})})
+      if(module==='hse'&&action==='inspection-result') { const result=window.prompt('Inspection result / findings');if(result===null)return;await call(`/api/safety/inspections/${id}/result`,token,{method:'PATCH',body:JSON.stringify({result})}) }
+      if(module==='hse'&&action==='corrective') { const work=await call<ModuleItem>('/api/work-orders',token,{method:'POST',body:JSON.stringify({source:'HSE',relatedTicket:item.reportCode,task:item.title,location:item.location,priority:item.severity,trade:'HSE & Safety',status:'Awaiting assignment'})});await call(`/api/safety/reports/${id}/work-order`,token,{method:'PATCH',body:JSON.stringify({workOrder:work.id})}) }
+      if(module==='iot'&&action==='simulate') { const reading=window.prompt(`Enter reading in ${String(item.readingUnit||'unit')}`);if(reading===null)return;if(!Number.isFinite(Number(reading)))throw Error('Enter a valid numeric reading.');await call(`/api/iot/devices/${id}/readings`,token,{method:'POST',body:JSON.stringify({reading:Number(reading)})}) }
+      if(module==='iot'&&action==='create-work-order') { const work=await call<ModuleItem>('/api/work-orders',token,{method:'POST',body:JSON.stringify({source:'IoT alert',relatedTicket:item.deviceCode,task:item.details,location:item.device,priority:'High',trade:'IoT / Facilities',status:'Awaiting assignment'})});await call(`/api/iot/alerts/${id}/work-order`,token,{method:'PATCH',body:JSON.stringify({workOrder:work.id})}) }
+      if(module==='amc'&&action==='contract-work-order') { const work=await call<ModuleItem>('/api/work-orders',token,{method:'POST',body:JSON.stringify({source:'AMC',relatedTicket:item.contractCode,task:item.scope,location:item.coveredAsset,priority:'Medium',trade:'Vendor / AMC',status:'Awaiting assignment'})});await call(`/api/contracts/${id}/work-order`,token,{method:'PATCH',body:JSON.stringify({workOrder:work.id})}) }
+      setNotice(action==='corrective'?'Corrective work order created and linked.':action==='simulate'?'Reading saved. Any threshold alert is listed below.':'Record updated.')
+      await loadModule()
+    } catch(e) { setError(e instanceof Error?e.message:'Unable to complete the action.') }
+    finally { setBusy(false) }
+  }
 
   async function createTower(name: string, floorCount: number) {
     setBusy(true); setError('')
@@ -224,12 +270,12 @@ export default function App() {
 
   function logout() {
     localStorage.removeItem('daymark-token'); localStorage.removeItem('daymark-user')
-    setToken(''); setUser(null); setRows([]); setActive(null); setTodayRecord(null); setShift(null); setWorkers([]); setSelectedWorkerId(''); setProperty(null); setTickets([]); setPage('attendance')
+    setToken(''); setUser(null); setRows([]); setActive(null); setTodayRecord(null); setShift(null); setWorkers([]); setSelectedWorkerId(''); setProperty(null); setTickets([]); setModuleItems([]); setPage('attendance')
   }
 
   function dismissAlerts() { setError(''); setNotice('') }
 
   if (!token || !user) return <LoginView mode={mode} setMode={setMode} busy={busy} error={error} showPassword={showPassword} setShowPassword={setShowPassword} onSubmit={auth} />
 
-  return <Dashboard user={user} workers={workers} selectedWorkerId={selectedWorkerId} page={page} property={property} tickets={tickets} rows={rows} active={active} todayRecord={todayRecord} shift={shift} from={from} to={to} loading={loading} busy={busy} error={error} notice={notice} onLogout={logout} onPageChange={setPage} onSelectWorker={setSelectedWorkerId} onCreateWorker={(name, employeeCode) => void createWorker(name, employeeCode)} onDeactivateWorker={(workerId) => void deactivateWorker(workerId)} onPunch={(action) => void punch(action)} onDismiss={dismissAlerts} onFromChange={setFrom} onToChange={setTo} onCreateTower={(name, floors) => void createTower(name, floors)} onUpdateProperty={details => void updateProperty(details)} onCreateUnit={unit => void createUnit(unit)} onCreateTicket={ticket => void createTicket(ticket)} />
+  return <Dashboard user={user} workers={workers} selectedWorkerId={selectedWorkerId} page={page} property={property} tickets={tickets} moduleItems={moduleItems} rows={rows} active={active} todayRecord={todayRecord} shift={shift} from={from} to={to} loading={loading} busy={busy} error={error} notice={notice} onLogout={logout} onPageChange={setPage} onSelectWorker={setSelectedWorkerId} onCreateWorker={(name, employeeCode) => void createWorker(name, employeeCode)} onDeactivateWorker={(workerId) => void deactivateWorker(workerId)} onPunch={(action) => void punch(action)} onDismiss={dismissAlerts} onFromChange={setFrom} onToChange={setTo} onCreateTower={(name, floors) => void createTower(name, floors)} onUpdateProperty={details => void updateProperty(details)} onCreateUnit={unit => void createUnit(unit)} onCreateTicket={ticket => void createTicket(ticket)} onModuleCreate={(module,item)=>void createModuleItem(module,item)} onModuleAction={(module,action,item)=>void moduleAction(module,action,item)} />
 }
