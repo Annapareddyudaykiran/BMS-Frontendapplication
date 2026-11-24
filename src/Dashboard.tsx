@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { ArrowRight, CalendarDays, Check, Clock3, LogOut, Search, ShieldCheck, Sparkles, UserPlus, Users, UserX, X, Building2, Ticket } from 'lucide-react'
+import { ArrowRight, CalendarDays, Check, Clock3, Search, ShieldCheck, Sparkles, UserPlus, Users, UserX, X, Building2, Ticket, LayoutDashboard } from 'lucide-react'
 
 export type DashboardUser = { id: string; email: string; fullName: string }
 export type Shift = { shiftStart: string; shiftEnd: string; zoneId: string }
@@ -29,7 +29,7 @@ type Props = {
   user: DashboardUser
   workers: Worker[]
   selectedWorkerId: string
-  page: 'attendance' | 'workers' | 'property' | 'helpdesk' | 'work-orders' | 'assets' | 'inventory' | 'procurement' | 'hse' | 'amc' | 'iot'
+  page: 'overview' | 'attendance' | 'workers' | 'property' | 'helpdesk' | 'work-orders' | 'assets' | 'inventory' | 'procurement' | 'hse' | 'amc' | 'iot'
   property: PropertyData | null
   tickets: HelpdeskTicket[]
   moduleItems: ModuleItem[]
@@ -44,7 +44,7 @@ type Props = {
   error: string
   notice: string
   onLogout: () => void
-  onPageChange: (page: 'attendance' | 'workers' | 'property' | 'helpdesk' | 'work-orders' | 'assets' | 'inventory' | 'procurement' | 'hse' | 'amc' | 'iot') => void
+  onPageChange: (page: Props['page']) => void
   onSelectWorker: (workerId: string) => void
   onCreateWorker: (name: string, employeeCode: string) => void
   onDeactivateWorker: (workerId: string) => void
@@ -115,6 +115,8 @@ export default function Dashboard(props: Props) {
     <aside>
       <img className="sidebar-brand-image" src="/ibest-logo.png" alt="iBEST Solutions" />
       <p className="section-label">WORKSPACE</p>
+      <nav className="nav-scroll">
+      <button className={'nav-item ' + (page === 'overview' ? 'selected' : '')} onClick={() => onPageChange('overview')}><LayoutDashboard size={17} /> Executive Overview</button>
       <button className={'nav-item ' + (page === 'attendance' ? 'selected' : '')} onClick={() => onPageChange('attendance')}><CalendarDays size={17} /> Attendance</button>
       <button className={'nav-item ' + (page === 'workers' ? 'selected' : '')} onClick={() => onPageChange('workers')}><Users size={17} /> Workers</button>
       <button className={'nav-item ' + (page === 'property' ? 'selected' : '')} onClick={() => onPageChange('property')}><Building2 size={17} /> Property & Units</button>
@@ -126,33 +128,33 @@ export default function Dashboard(props: Props) {
       <button className={'nav-item ' + (page === 'hse' ? 'selected' : '')} onClick={() => onPageChange('hse')}><ShieldCheck size={17} /> HSE & Safety</button>
       <button className={'nav-item ' + (page === 'amc' ? 'selected' : '')} onClick={() => onPageChange('amc')}><Building2 size={17} /> AMC & Vendors</button>
       <button className={'nav-item ' + (page === 'iot' ? 'selected' : '')} onClick={() => onPageChange('iot')}><Clock3 size={17} /> IoT Monitoring</button>
+      </nav>
       <div className="side-end">
-        <div className="privacy"><ShieldCheck size={16} /> Your time is in good hands.</div>
-        <button className="account" onClick={onLogout}>
+        <div className="account">
           <span className="avatar">{user.fullName[0].toUpperCase()}</span>
           <span><b>{user.fullName}</b><small>{user.email}</small></span>
-          <LogOut size={15} />
-        </button>
+        </div>
+        <button className="logout-button" onClick={onLogout}>Log out</button>
       </div>
     </aside>
 
     <main className="main">
-      <header>Workspace <i>/</i> <b>{page === 'workers' ? 'Workers' : page === 'property' ? 'Property & Units' : page === 'helpdesk' ? 'Helpdesk & SLA' : page === 'work-orders' ? 'Work Orders' : page === 'assets' ? 'Assets & PPM' : page === 'inventory' ? 'Inventory' : page === 'procurement' ? 'Procurement' : page === 'hse' ? 'HSE & Safety' : page === 'amc' ? 'AMC & Vendors' : page === 'iot' ? 'IoT Monitoring' : 'Attendance'}</b><span className="top-user"><i /> Administrator <span className="avatar">{user.fullName[0].toUpperCase()}</span></span></header>
+      <header><span className="top-user"><i /> Administrator <span className="avatar">{user.fullName[0].toUpperCase()}</span></span></header>
       <div className="content">
         <div className="welcome">
           <div>
             <p className="eyebrow">{today.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' }).toUpperCase()}</p>
-            <h1>{page === 'attendance' ? 'Attendance overview' : page === 'workers' ? 'Workforce & Attendance' : page === 'property' ? 'Property & Units' : page === 'helpdesk' ? 'Helpdesk & SLA' : page === 'work-orders' ? 'Work Orders' : page === 'assets' ? 'Assets & PPM' : page === 'inventory' ? 'Inventory Management' : page === 'procurement' ? 'Procurement' : page === 'hse' ? 'HSE & Safety' : page === 'amc' ? 'AMC & Vendors' : 'IoT Monitoring'}</h1>
+            <h1>{page === 'overview' ? 'Operations Dashboard' : page === 'attendance' ? 'Attendance overview' : page === 'workers' ? 'Workforce & Attendance' : page === 'property' ? 'Property & Units' : page === 'helpdesk' ? 'Helpdesk & SLA' : page === 'work-orders' ? 'Work Orders' : page === 'assets' ? 'Assets & PPM' : page === 'inventory' ? 'Inventory Management' : page === 'procurement' ? 'Procurement' : page === 'hse' ? 'HSE & Safety' : page === 'amc' ? 'AMC & Vendors' : 'IoT Monitoring'}</h1>
             <p className="muted">{today.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })} · iBEST Operations</p>
           </div>
           <span className="date-chip"><CalendarDays size={15} />{today.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}</span>
         </div>
 
-        {(error || notice) && <div className={'alert ' + (error ? 'error' : 'success')}>
-          {error || notice}<button onClick={onDismiss} aria-label="Dismiss"><X size={15} /></button>
+        {error && <div className="alert error">
+          {error}<button onClick={onDismiss} aria-label="Dismiss"><X size={15} /></button>
         </div>}
 
-        {(['work-orders','assets','inventory','procurement','hse','amc','iot'] as string[]).includes(page) ? <OperationsModule page={page as 'work-orders' | 'assets' | 'inventory' | 'procurement' | 'hse' | 'amc' | 'iot'} items={moduleItems} busy={busy} onCreate={onModuleCreate} onAction={onModuleAction} /> : page === 'property' ? <PropertyView property={property} busy={busy} onCreateTower={onCreateTower} onUpdateProperty={onUpdateProperty} onCreateUnit={onCreateUnit} /> : page === 'helpdesk' ? <HelpdeskView property={property} tickets={tickets} busy={busy} onCreateTicket={onCreateTicket} /> : page === 'workers' ? <section className="card worker-management">
+        {page === 'overview' ? <ExecutiveOverview onOpenTickets={() => onPageChange('helpdesk')} /> : (['work-orders','assets','inventory','procurement','hse','amc','iot'] as string[]).includes(page) ? <OperationsModule page={page as 'work-orders' | 'assets' | 'inventory' | 'procurement' | 'hse' | 'amc' | 'iot'} items={moduleItems} busy={busy} onCreate={onModuleCreate} onAction={onModuleAction} /> : page === 'property' ? <PropertyView property={property} busy={busy} onCreateTower={onCreateTower} onUpdateProperty={onUpdateProperty} onCreateUnit={onCreateUnit} /> : page === 'helpdesk' ? <HelpdeskView property={property} tickets={tickets} busy={busy} onCreateTicket={onCreateTicket} /> : page === 'workers' ? <section className="card worker-management">
           <p className="eyebrow">WORKER DIRECTORY</p>
           <h2>Register workers</h2>
           <p className="muted">Add the people whose attendance you manage. Deactivating a worker preserves their attendance history.</p>
@@ -254,6 +256,27 @@ export default function Dashboard(props: Props) {
   </div>
 }
 
+function ExecutiveOverview({ onOpenTickets }: { onOpenTickets: () => void }) {
+  const metrics = [['Active properties', '3', '1 selected for demo'], ['Occupied units', '378', '90% occupancy'], ['Open tickets', '3', 'Prioritize critical incidents'], ['Active work orders', '3', 'Scheduled + reactive']]
+  const tickets = [
+    ['TKT-1042', 'AHU-04 cooling failure', 'Critical', 'Open'],
+    ['TKT-1041', 'Water leakage in washroom', 'High', 'Assigned'],
+    ['TKT-1040', 'Lobby light flickering', 'Medium', 'In Progress'],
+  ]
+  return <section className="executive-overview">
+    <div className="command-banner">
+      <div><h2>Facility command center</h2><p>Demo site: Lakeview Tech & Residences · 3 towers · 18 floors · 420 units</p></div>
+      <button className="overview-manage" onClick={onOpenTickets}>Manage tickets <ArrowRight size={15} /></button>
+    </div>
+    <div className="overview-metrics">{metrics.map(([label, value, note]) => <div className="overview-metric card" key={label}><small>{label}</small><b>{value}</b><span>{note}</span></div>)}</div>
+    <div className="overview-panels">
+      <section className="card"><h2>Priority ticket queue</h2><div className="table-scroll"><table><thead><tr><th>TICKET</th><th>ISSUE</th><th>PRIORITY</th><th>STATUS</th></tr></thead><tbody>{tickets.map(([id, issue, priority, status]) => <tr key={id}><td>{id}</td><td>{issue}</td><td><span className={'overview-tag priority-' + priority.toLowerCase()}>{priority}</span></td><td><span className={'overview-tag status-' + status.toLowerCase().replace(' ', '-')}>{status}</span></td></tr>)}</tbody></table></div></section>
+      <section className="card readiness"><h2>Operational readiness</h2><label>Shift attendance <b>75%</b></label><div className="progress"><span style={{ width: '75%' }} /></div><label>Occupancy <b>90%</b></label><div className="progress"><span style={{ width: '90%' }} /></div><p>Illustrative overview snapshot for workspace updates.</p></section>
+    </div>
+    <p className="overview-footnote">Sample overview for display only. This screen does not create or store records.</p>
+  </section>
+}
+
 function PropertyView({ property, busy, onCreateTower, onUpdateProperty, onCreateUnit }: { property: PropertyData | null; busy: boolean; onCreateTower: (name: string, floors: number) => void; onUpdateProperty: Props['onUpdateProperty']; onCreateUnit: Props['onCreateUnit'] }) {
   const [towerId, setTowerId] = useState('')
   const [floor, setFloor] = useState(1)
@@ -333,7 +356,7 @@ function OperationsModule({ page, items, busy, onCreate, onAction }: { page: 'wo
   const stats=page==='hse'?[['Safety reports',items.filter(i=>i.recordType==='report').length],['Open HSE actions',items.filter(i=>i.recordType==='report'&&i.status!=='Verified').length],['Inspections',items.filter(i=>i.recordType==='inspection').length]]:page==='amc'?[['Service contracts',items.length],['Active contracts',items.filter(i=>i.status==='Active').length],['Expired / expiring',items.filter(i=>i.status==='Expired').length],['AMC work orders',0]]:page==='iot'?[['Devices',items.filter(i=>i.recordType==='device').length],['Open alerts',items.filter(i=>i.recordType==='alert'&&i.status==='Open').length],['Work orders from alerts',items.filter(i=>i.recordType==='alert'&&!!i.workOrder).length]]:[]
   const submit=(event:React.FormEvent<HTMLFormElement>)=>{event.preventDefault();const data=new FormData(event.currentTarget);const item:ModuleItem={};values.forEach(field=>item[field.key]=String(data.get(field.key)||''));if(page==='hse')item.recordType=formMode;onCreate(page,item);setFormOpen(false)}
   return <section className="operations-module">
-    <div className="module-heading"><div><p className="eyebrow">OPERATIONS</p><h2>{title}</h2><p className="muted">Records are saved through the API gateway to this module’s dedicated service.</p></div><div className="module-actions">{page==='hse'?<><button className="primary" onClick={()=>openForm('report')}>+ Report incident / hazard</button><button className="secondary" onClick={()=>openForm('inspection')}>+ Schedule inspection</button></>:<button className="primary" onClick={()=>openForm()}>{page === 'work-orders' ? '+ Create work order' : page === 'assets' ? '+ Add asset / PPM schedule' : page === 'inventory' ? '+ Add item' : page==='amc'?'+ Add AMC / contract':page==='iot'?'+ Register device':'+ Create purchase request'}</button>}</div></div>
+    <div className="module-actions module-toolbar">{page==='hse'?<><button className="primary" onClick={()=>openForm('report')}>+ Report incident / hazard</button><button className="secondary" onClick={()=>openForm('inspection')}>+ Schedule inspection</button></>:<button className="primary" onClick={()=>openForm()}>{page === 'work-orders' ? '+ Create work order' : page === 'assets' ? '+ Add asset / PPM schedule' : page === 'inventory' ? '+ Add item' : page==='amc'?'+ Add AMC / contract':page==='iot'?'+ Register device':'+ Create purchase request'}</button>}</div>
     {!!stats.length&&<div className="module-stats">{stats.map(([label,count])=><div className="card" key={label}><small>{label}</small><b>{count}</b></div>)}</div>}
     {page === 'inventory' && <div className="module-actions"><button className="secondary" onClick={() => setFormOpen(true)}>Stock in / receive goods</button><button className="secondary" onClick={() => setFormOpen(true)}>Stock out / issue to work order</button><button className="secondary" onClick={() => onCreate('procurement',{item:'',quantity:1,reason:'Low stock reorder'})}>Create reorder request</button></div>}
     {page === 'assets' && <p className="module-note">PPM schedules generate related work orders for technicians to complete and supervisors to verify.</p>}

@@ -91,7 +91,7 @@ export default function App() {
   const [shift, setShift] = useState<Shift | null>(null)
   const [workers, setWorkers] = useState<Worker[]>([])
   const [selectedWorkerId, setSelectedWorkerId] = useState('')
-  const [page, setPage] = useState<'attendance' | 'workers' | 'property' | 'helpdesk' | 'work-orders' | 'assets' | 'inventory' | 'procurement' | 'hse' | 'amc' | 'iot'>('attendance')
+  const [page, setPage] = useState<'overview' | 'attendance' | 'workers' | 'property' | 'helpdesk' | 'work-orders' | 'assets' | 'inventory' | 'procurement' | 'hse' | 'amc' | 'iot'>('overview')
   const [moduleItems, setModuleItems] = useState<ModuleItem[]>([])
   const [property, setProperty] = useState<PropertyData | null>(null)
   const [tickets, setTickets] = useState<HelpdeskTicket[]>([])
@@ -114,7 +114,7 @@ export default function App() {
     }
   }, [token])
 
-  useEffect(() => { void loadWorkers() }, [loadWorkers])
+  useEffect(() => { if (page === 'attendance' || page === 'workers') void loadWorkers() }, [loadWorkers, page])
 
   const loadProperty = useCallback(async () => {
     if (!token) return
@@ -126,7 +126,10 @@ export default function App() {
     try { setTickets(await call<HelpdeskTicket[]>('/api/helpdesk/tickets', token)) }
     catch (e) { setError(e instanceof Error ? e.message : 'Unable to load tickets.') }
   }, [token])
-  useEffect(() => { void loadProperty(); void loadTickets() }, [loadProperty, loadTickets])
+  useEffect(() => {
+    if (page === 'property') void loadProperty()
+    if (page === 'helpdesk') { void loadProperty(); void loadTickets() }
+  }, [loadProperty, loadTickets, page])
 
   const moduleApi: Record<'work-orders' | 'assets' | 'inventory' | 'procurement' | 'hse' | 'amc' | 'iot', string> = { 'work-orders': '/api/work-orders', assets: '/api/assets', inventory: '/api/inventory', procurement: '/api/procurement', hse:'/api/safety', amc:'/api/contracts', iot:'/api/iot' }
   const loadModule = useCallback(async () => {
@@ -144,12 +147,12 @@ export default function App() {
   }, [token, page])
   useEffect(() => { void loadModule() }, [loadModule])
   async function createModuleItem(module: 'work-orders' | 'assets' | 'inventory' | 'procurement' | 'hse' | 'amc' | 'iot', item: ModuleItem) {
-    setBusy(true); setError('')
+    setBusy(true); setError(''); setNotice('')
     try {
       const path = module === 'hse' ? `/api/safety/${item.recordType === 'inspection' ? 'inspections' : 'reports'}` : module === 'iot' ? '/api/iot/devices' : moduleApi[module]
       const data={...item}; delete data.recordType
       await call(path, token, { method: 'POST', body: JSON.stringify(data) })
-      setPage(module); setNotice('Record saved successfully.')
+      setPage(module)
       if(module==='hse'||module==='iot') { const [a,b]=await Promise.all([call<ModuleItem[]>(module==='hse'?'/api/safety/reports':'/api/iot/devices',token),call<ModuleItem[]>(module==='hse'?'/api/safety/inspections':'/api/iot/alerts',token)]);setModuleItems(module==='hse'?[...a.map(row=>({...row,recordType:'report'})),...b.map(row=>({...row,recordType:'inspection'}))]:[...a.map(row=>({...row,recordType:'device'})),...b.map(row=>({...row,recordType:'alert'}))]) }
       else setModuleItems(await call<ModuleItem[]>(moduleApi[module], token))
     } catch (e) { setError(e instanceof Error ? e.message : 'Unable to save record.') }
@@ -212,7 +215,7 @@ export default function App() {
     finally { setLoading(false) }
   }, [token, selectedWorkerId, from, to])
 
-  useEffect(() => { void refresh() }, [refresh])
+  useEffect(() => { if (page === 'attendance') void refresh() }, [refresh, page])
 
   async function auth(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault(); setBusy(true); setError('')
@@ -223,7 +226,7 @@ export default function App() {
     try {
       const result = await call<{ token: string; user: User }>('/api/auth/' + mode, undefined, { method: 'POST', body: JSON.stringify(data) })
       localStorage.setItem('daymark-token', result.token); localStorage.setItem('daymark-user', JSON.stringify(result.user))
-      setToken(result.token); setUser(result.user); setNotice('Welcome to iBEST.')
+      setToken(result.token); setUser(result.user); setPage('overview'); setNotice('Welcome to iBEST.')
     } catch (e) { setError(e instanceof Error ? e.message : 'Unable to sign in.') }
     finally { setBusy(false) }
   }
@@ -270,7 +273,7 @@ export default function App() {
 
   function logout() {
     localStorage.removeItem('daymark-token'); localStorage.removeItem('daymark-user')
-    setToken(''); setUser(null); setRows([]); setActive(null); setTodayRecord(null); setShift(null); setWorkers([]); setSelectedWorkerId(''); setProperty(null); setTickets([]); setModuleItems([]); setPage('attendance')
+    setToken(''); setUser(null); setRows([]); setActive(null); setTodayRecord(null); setShift(null); setWorkers([]); setSelectedWorkerId(''); setProperty(null); setTickets([]); setModuleItems([]); setPage('overview')
   }
 
   function dismissAlerts() { setError(''); setNotice('') }
