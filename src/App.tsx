@@ -3,7 +3,7 @@ import {
   ArrowRight, CalendarDays, Check, Clock3, Eye, EyeOff, LogOut, Mail,
   ShieldCheck, UserRound, X,
 } from 'lucide-react'
-import Dashboard, { type AttendanceRow, type DashboardUser, type Shift, type Worker } from './Dashboard'
+import Dashboard, { type AttendanceRow, type DashboardUser, type Shift, type Worker, type PropertyData, type HelpdeskTicket, type PropertyUnit } from './Dashboard'
 
 const API = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080').replace(/\/$/, '')
 type User = DashboardUser
@@ -20,7 +20,6 @@ async function call<T>(path: string, token?: string, init: RequestInit = {}): Pr
 }
 
 const iso = (d: Date) => new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10)
-const clock = (d: string | null) => d ? new Date(d).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : '—'
 
 function LoginView({
   mode, setMode, busy, error, showPassword, setShowPassword, onSubmit,
@@ -90,7 +89,9 @@ export default function App() {
   const [shift, setShift] = useState<Shift | null>(null)
   const [workers, setWorkers] = useState<Worker[]>([])
   const [selectedWorkerId, setSelectedWorkerId] = useState('')
-  const [page, setPage] = useState<'attendance' | 'workers'>('attendance')
+  const [page, setPage] = useState<'attendance' | 'workers' | 'property' | 'helpdesk'>('attendance')
+  const [property, setProperty] = useState<PropertyData | null>(null)
+  const [tickets, setTickets] = useState<HelpdeskTicket[]>([])
   const [from, setFrom] = useState(iso(new Date(Date.now() - 30 * 86400000)))
   const [to, setTo] = useState(iso(new Date()))
   const [loading, setLoading] = useState(false)
@@ -111,6 +112,43 @@ export default function App() {
   }, [token])
 
   useEffect(() => { void loadWorkers() }, [loadWorkers])
+
+  const loadProperty = useCallback(async () => {
+    if (!token) return
+    try { setProperty(await call<PropertyData>('/api/property', token)) }
+    catch (e) { setError(e instanceof Error ? e.message : 'Unable to load property.') }
+  }, [token])
+  const loadTickets = useCallback(async () => {
+    if (!token) return
+    try { setTickets(await call<HelpdeskTicket[]>('/api/helpdesk/tickets', token)) }
+    catch (e) { setError(e instanceof Error ? e.message : 'Unable to load tickets.') }
+  }, [token])
+  useEffect(() => { void loadProperty(); void loadTickets() }, [loadProperty, loadTickets])
+
+  async function createTower(name: string, floorCount: number) {
+    setBusy(true); setError('')
+    try { await call('/api/property/towers', token, { method: 'POST', body: JSON.stringify({ name, floorCount }) }); await loadProperty(); setNotice(`${name} was added.`) }
+    catch (e) { setError(e instanceof Error ? e.message : 'Unable to add tower.') }
+    finally { setBusy(false) }
+  }
+  async function updateProperty(details: { name: string; city: string; state: string; propertyType: string }) {
+    setBusy(true); setError('')
+    try { await call('/api/property', token, { method: 'PUT', body: JSON.stringify(details) }); await loadProperty(); setNotice('Property details were updated.') }
+    catch (e) { setError(e instanceof Error ? e.message : 'Unable to update property.') }
+    finally { setBusy(false) }
+  }
+  async function createUnit(unit: Omit<PropertyUnit, 'id'>) {
+    setBusy(true); setError('')
+    try { await call('/api/property/units', token, { method: 'POST', body: JSON.stringify(unit) }); await loadProperty(); setNotice(`${unit.unitNumber} was added.`) }
+    catch (e) { setError(e instanceof Error ? e.message : 'Unable to add unit.') }
+    finally { setBusy(false) }
+  }
+  async function createTicket(ticket: { description: string; towerId: string; floorArea: string; unitId: string | null; category: string; priority: string }) {
+    setBusy(true); setError('')
+    try { await call('/api/helpdesk/tickets', token, { method: 'POST', body: JSON.stringify(ticket) }); await loadTickets(); setNotice('Ticket raised and an unassigned work order was created.') }
+    catch (e) { setError(e instanceof Error ? e.message : 'Unable to raise ticket.') }
+    finally { setBusy(false) }
+  }
 
   const refresh = useCallback(async () => {
     if (!token || !selectedWorkerId) {
@@ -186,12 +224,12 @@ export default function App() {
 
   function logout() {
     localStorage.removeItem('daymark-token'); localStorage.removeItem('daymark-user')
-    setToken(''); setUser(null); setRows([]); setActive(null); setTodayRecord(null); setShift(null); setWorkers([]); setSelectedWorkerId(''); setPage('attendance')
+    setToken(''); setUser(null); setRows([]); setActive(null); setTodayRecord(null); setShift(null); setWorkers([]); setSelectedWorkerId(''); setProperty(null); setTickets([]); setPage('attendance')
   }
 
   function dismissAlerts() { setError(''); setNotice('') }
 
   if (!token || !user) return <LoginView mode={mode} setMode={setMode} busy={busy} error={error} showPassword={showPassword} setShowPassword={setShowPassword} onSubmit={auth} />
 
-  return <Dashboard user={user} workers={workers} selectedWorkerId={selectedWorkerId} page={page} rows={rows} active={active} todayRecord={todayRecord} shift={shift} from={from} to={to} loading={loading} busy={busy} error={error} notice={notice} onLogout={logout} onPageChange={setPage} onSelectWorker={setSelectedWorkerId} onCreateWorker={(name, employeeCode) => void createWorker(name, employeeCode)} onDeactivateWorker={(workerId) => void deactivateWorker(workerId)} onPunch={(action) => void punch(action)} onDismiss={dismissAlerts} onFromChange={setFrom} onToChange={setTo} />
+  return <Dashboard user={user} workers={workers} selectedWorkerId={selectedWorkerId} page={page} property={property} tickets={tickets} rows={rows} active={active} todayRecord={todayRecord} shift={shift} from={from} to={to} loading={loading} busy={busy} error={error} notice={notice} onLogout={logout} onPageChange={setPage} onSelectWorker={setSelectedWorkerId} onCreateWorker={(name, employeeCode) => void createWorker(name, employeeCode)} onDeactivateWorker={(workerId) => void deactivateWorker(workerId)} onPunch={(action) => void punch(action)} onDismiss={dismissAlerts} onFromChange={setFrom} onToChange={setTo} onCreateTower={(name, floors) => void createTower(name, floors)} onUpdateProperty={details => void updateProperty(details)} onCreateUnit={unit => void createUnit(unit)} onCreateTicket={ticket => void createTicket(ticket)} />
 }
