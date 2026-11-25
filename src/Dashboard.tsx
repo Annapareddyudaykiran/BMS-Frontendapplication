@@ -33,6 +33,8 @@ type Props = {
   property: PropertyData | null
   tickets: HelpdeskTicket[]
   moduleItems: ModuleItem[]
+  overviewWorkOrders: ModuleItem[]
+  overviewAttendance: { checkedIn: number; activeWorkers: number }
   rows: AttendanceRow[]
   active: AttendanceRow | null
   todayRecord: AttendanceRow | null
@@ -92,7 +94,7 @@ function exitLabel(row: AttendanceRow) {
 
 export default function Dashboard(props: Props) {
   const {
-    user, workers, selectedWorkerId, page, rows, active, todayRecord, shift, from, to, loading, busy, error, notice, property, tickets, moduleItems,
+    user, workers, selectedWorkerId, page, rows, active, todayRecord, shift, from, to, loading, busy, error, notice, property, tickets, moduleItems, overviewWorkOrders, overviewAttendance,
     onLogout, onPageChange, onSelectWorker, onCreateWorker, onDeactivateWorker, onPunch, onDismiss, onFromChange, onToChange, onCreateTower, onUpdateProperty, onCreateUnit, onCreateTicket, onModuleCreate, onModuleAction,
   } = props
   const [workerSearch, setWorkerSearch] = useState('')
@@ -154,7 +156,7 @@ export default function Dashboard(props: Props) {
           {error}<button onClick={onDismiss} aria-label="Dismiss"><X size={15} /></button>
         </div>}
 
-        {page === 'overview' ? <ExecutiveOverview onOpenTickets={() => onPageChange('helpdesk')} /> : (['work-orders','assets','inventory','procurement','hse','amc','iot'] as string[]).includes(page) ? <OperationsModule page={page as 'work-orders' | 'assets' | 'inventory' | 'procurement' | 'hse' | 'amc' | 'iot'} items={moduleItems} busy={busy} onCreate={onModuleCreate} onAction={onModuleAction} /> : page === 'property' ? <PropertyView property={property} busy={busy} onCreateTower={onCreateTower} onUpdateProperty={onUpdateProperty} onCreateUnit={onCreateUnit} /> : page === 'helpdesk' ? <HelpdeskView property={property} tickets={tickets} busy={busy} onCreateTicket={onCreateTicket} /> : page === 'workers' ? <section className="card worker-management">
+        {page === 'overview' ? <ExecutiveOverview onOpenTickets={() => onPageChange('helpdesk')} property={property} tickets={tickets} workOrders={overviewWorkOrders} attendance={overviewAttendance} /> : (['work-orders','assets','inventory','procurement','hse','amc','iot'] as string[]).includes(page) ? <OperationsModule page={page as 'work-orders' | 'assets' | 'inventory' | 'procurement' | 'hse' | 'amc' | 'iot'} items={moduleItems} busy={busy} onCreate={onModuleCreate} onAction={onModuleAction} /> : page === 'property' ? <PropertyView property={property} busy={busy} onCreateTower={onCreateTower} onUpdateProperty={onUpdateProperty} onCreateUnit={onCreateUnit} /> : page === 'helpdesk' ? <HelpdeskView property={property} tickets={tickets} busy={busy} onCreateTicket={onCreateTicket} /> : page === 'workers' ? <section className="card worker-management">
           <p className="eyebrow">WORKER DIRECTORY</p>
           <h2>Register workers</h2>
           <p className="muted">Add the people whose attendance you manage. Deactivating a worker preserves their attendance history.</p>
@@ -256,24 +258,43 @@ export default function Dashboard(props: Props) {
   </div>
 }
 
-function ExecutiveOverview({ onOpenTickets }: { onOpenTickets: () => void }) {
-  const metrics = [['Active properties', '3', '1 selected for demo'], ['Occupied units', '378', '90% occupancy'], ['Open tickets', '3', 'Prioritize critical incidents'], ['Active work orders', '3', 'Scheduled + reactive']]
-  const tickets = [
-    ['TKT-1042', 'AHU-04 cooling failure', 'Critical', 'Open'],
-    ['TKT-1041', 'Water leakage in washroom', 'High', 'Assigned'],
-    ['TKT-1040', 'Lobby light flickering', 'Medium', 'In Progress'],
+function ExecutiveOverview({ onOpenTickets, property, tickets, workOrders, attendance }: {
+  onOpenTickets: () => void
+  property: PropertyData | null
+  tickets: HelpdeskTicket[]
+  workOrders: ModuleItem[]
+  attendance: { checkedIn: number; activeWorkers: number }
+}) {
+  const openTickets = tickets.filter(ticket => !['closed', 'resolved', 'cancelled'].includes(ticket.status.toLowerCase()))
+  const priorityRank: Record<string, number> = { critical: 0, high: 1, medium: 2, low: 3 }
+  const priorityTickets = [...openTickets].sort((a, b) =>
+    (priorityRank[a.priority.toLowerCase()] ?? 4) - (priorityRank[b.priority.toLowerCase()] ?? 4)
+      || new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+  ).slice(0, 3)
+  const activeWorkOrders = workOrders.filter(order => !['closed', 'complete', 'completed', 'cancelled', 'verified'].includes(String(order.status || '').toLowerCase()))
+  const totalUnits = property?.units.length || 0
+  const occupiedUnits = property?.units.filter(unit => unit.occupancy.toLowerCase() === 'occupied').length || 0
+  const occupancyPercent = totalUnits ? Math.round(occupiedUnits / totalUnits * 100) : 0
+  const attendancePercent = attendance.activeWorkers ? Math.round(attendance.checkedIn / attendance.activeWorkers * 100) : 0
+  const towerCount = property?.towers.length || 0
+  const floorCount = property?.towers.reduce((total, tower) => total + tower.floorCount, 0) || 0
+  const metrics = [
+    ['Active properties', property ? '1' : '0', property?.property.name || 'No property registered'],
+    ['Occupied units', String(occupiedUnits), `${occupancyPercent}% of ${totalUnits} units`],
+    ['Open tickets', String(openTickets.length), openTickets.length ? 'Prioritize critical incidents' : 'No open tickets'],
+    ['Active work orders', String(activeWorkOrders.length), 'Scheduled + reactive'],
   ]
   return <section className="executive-overview">
     <div className="command-banner">
-      <div><h2>Facility command center</h2><p>Demo site: Lakeview Tech & Residences · 3 towers · 18 floors · 420 units</p></div>
+      <div><h2>Facility command center</h2><p>{property ? `${property.property.name} · ${towerCount} towers · ${floorCount} floors · ${totalUnits} units` : 'No property data is available yet.'}</p></div>
       <button className="overview-manage" onClick={onOpenTickets}>Manage tickets <ArrowRight size={15} /></button>
     </div>
     <div className="overview-metrics">{metrics.map(([label, value, note]) => <div className="overview-metric card" key={label}><small>{label}</small><b>{value}</b><span>{note}</span></div>)}</div>
     <div className="overview-panels">
-      <section className="card"><h2>Priority ticket queue</h2><div className="table-scroll"><table><thead><tr><th>TICKET</th><th>ISSUE</th><th>PRIORITY</th><th>STATUS</th></tr></thead><tbody>{tickets.map(([id, issue, priority, status]) => <tr key={id}><td>{id}</td><td>{issue}</td><td><span className={'overview-tag priority-' + priority.toLowerCase()}>{priority}</span></td><td><span className={'overview-tag status-' + status.toLowerCase().replace(' ', '-')}>{status}</span></td></tr>)}</tbody></table></div></section>
-      <section className="card readiness"><h2>Operational readiness</h2><label>Shift attendance <b>75%</b></label><div className="progress"><span style={{ width: '75%' }} /></div><label>Occupancy <b>90%</b></label><div className="progress"><span style={{ width: '90%' }} /></div><p>Illustrative overview snapshot for workspace updates.</p></section>
+      <section className="card"><h2>Priority ticket queue</h2><div className="table-scroll"><table><thead><tr><th>TICKET</th><th>ISSUE</th><th>PRIORITY</th><th>STATUS</th></tr></thead><tbody>{priorityTickets.map(ticket => <tr key={ticket.id}><td>{ticket.ticketNumber}</td><td>{ticket.description}</td><td><span className={'overview-tag priority-' + ticket.priority.toLowerCase()}>{ticket.priority}</span></td><td><span className={'overview-tag status-' + ticket.status.toLowerCase().replace(/\s+/g, '-')}>{ticket.status}</span></td></tr>)}{!priorityTickets.length && <tr><td className="empty" colSpan={4}>No open tickets.</td></tr>}</tbody></table></div></section>
+      <section className="card readiness"><h2>Operational readiness</h2><label>Shift attendance <b>{attendancePercent}%</b></label><div className="progress"><span style={{ width: `${attendancePercent}%` }} /></div><label>Occupancy <b>{occupancyPercent}%</b></label><div className="progress"><span style={{ width: `${occupancyPercent}%` }} /></div><p>{attendance.activeWorkers ? `${attendance.checkedIn} of ${attendance.activeWorkers} active workers checked in.` : 'No active workers registered.'}</p></section>
     </div>
-    <p className="overview-footnote">Sample overview for display only. This screen does not create or store records.</p>
+    <p className="overview-footnote">Live data from property, helpdesk, work orders, and attendance.</p>
   </section>
 }
 

@@ -37,9 +37,6 @@ function LoginView({
   return <main className="auth-shell">
     <section className="auth-visual">
       <div className="visual-glow" />
-      <div className="visual-building building-back" />
-      <div className="visual-building building-mid" />
-      <div className="visual-building building-front" />
       <div className="visual-top">
         <img className="visual-logo" src="/ibest-logo.png" alt="iBEST Solutions" />
         <span className="visual-tag"><i /> ATTENDANCE, MADE SIMPLE</span>
@@ -54,7 +51,7 @@ function LoginView({
           <div><span><ShieldCheck size={21} /></span><small>Secure by<br />design</small></div>
         </div>
       </div>
-      <div className="visual-bottom"><span>Make space for a better workday.</span><span>DAYMARK <b>✳</b></span></div>
+      <div className="visual-bottom"><span>Make space for a better workday.</span></div>
     </section>
 
     <section className="auth-main">
@@ -72,8 +69,6 @@ function LoginView({
         </form>
 
         <div className="auth-switch"><span>{mode === 'login' ? 'New to iBEST?' : 'Already have an account?'}</span><button onClick={() => setMode(mode === 'login' ? 'register' : 'login')}>{mode === 'login' ? 'Create an account' : 'Sign in'}</button></div>
-        <div className="auth-divider"><span /> <i>YOUR TIME, IN GOOD HANDS</i> <span /></div>
-        <p className="secure"><ShieldCheck size={15} /> Your data is private and secure</p>
       </div>
       <div className="mobile-footer">iBEST Solutions <b>✳</b> · Your workday, in focus</div>
     </section>
@@ -93,6 +88,8 @@ export default function App() {
   const [selectedWorkerId, setSelectedWorkerId] = useState('')
   const [page, setPage] = useState<'overview' | 'attendance' | 'workers' | 'property' | 'helpdesk' | 'work-orders' | 'assets' | 'inventory' | 'procurement' | 'hse' | 'amc' | 'iot'>('overview')
   const [moduleItems, setModuleItems] = useState<ModuleItem[]>([])
+  const [overviewWorkOrders, setOverviewWorkOrders] = useState<ModuleItem[]>([])
+  const [overviewAttendance, setOverviewAttendance] = useState({ checkedIn: 0, activeWorkers: 0 })
   const [property, setProperty] = useState<PropertyData | null>(null)
   const [tickets, setTickets] = useState<HelpdeskTicket[]>([])
   const [from, setFrom] = useState(iso(new Date(Date.now() - 30 * 86400000)))
@@ -126,6 +123,33 @@ export default function App() {
     try { setTickets(await call<HelpdeskTicket[]>('/api/helpdesk/tickets', token)) }
     catch (e) { setError(e instanceof Error ? e.message : 'Unable to load tickets.') }
   }, [token])
+  const loadOverview = useCallback(async () => {
+    if (!token) return
+    const results = await Promise.allSettled([
+      call<PropertyData>('/api/property', token),
+      call<HelpdeskTicket[]>('/api/helpdesk/tickets', token),
+      call<ModuleItem[]>('/api/work-orders', token),
+      call<Worker[]>('/api/attendance/workers', token),
+    ])
+    const failed: string[] = []
+    if (results[0].status === 'fulfilled') setProperty(results[0].value)
+    else failed.push('property')
+    if (results[1].status === 'fulfilled') setTickets(results[1].value)
+    else failed.push('helpdesk')
+    if (results[2].status === 'fulfilled') setOverviewWorkOrders(results[2].value)
+    else failed.push('work orders')
+    if (results[3].status === 'fulfilled') {
+      const activeRoster = results[3].value.filter(worker => worker.active)
+      const attendanceResults = await Promise.allSettled(activeRoster.map(worker =>
+        call<{ checkedIn: boolean }>('/api/attendance/status?workerId=' + encodeURIComponent(worker.id), token),
+      ))
+      const checkedIn = attendanceResults.reduce((count, result) => count + (result.status === 'fulfilled' && result.value.checkedIn ? 1 : 0), 0)
+      setOverviewAttendance({ checkedIn, activeWorkers: activeRoster.length })
+      if (attendanceResults.some(result => result.status === 'rejected')) failed.push('attendance')
+    } else failed.push('attendance')
+    setError(failed.length ? `Overview could not load ${failed.join(', ')}. Other available data is shown.` : '')
+  }, [token])
+  useEffect(() => { if (page === 'overview') void loadOverview() }, [loadOverview, page])
   useEffect(() => {
     if (page === 'property') void loadProperty()
     if (page === 'helpdesk') { void loadProperty(); void loadTickets() }
@@ -273,12 +297,12 @@ export default function App() {
 
   function logout() {
     localStorage.removeItem('daymark-token'); localStorage.removeItem('daymark-user')
-    setToken(''); setUser(null); setRows([]); setActive(null); setTodayRecord(null); setShift(null); setWorkers([]); setSelectedWorkerId(''); setProperty(null); setTickets([]); setModuleItems([]); setPage('overview')
+    setToken(''); setUser(null); setRows([]); setActive(null); setTodayRecord(null); setShift(null); setWorkers([]); setSelectedWorkerId(''); setProperty(null); setTickets([]); setModuleItems([]); setOverviewWorkOrders([]); setOverviewAttendance({ checkedIn: 0, activeWorkers: 0 }); setPage('overview')
   }
 
   function dismissAlerts() { setError(''); setNotice('') }
 
   if (!token || !user) return <LoginView mode={mode} setMode={setMode} busy={busy} error={error} showPassword={showPassword} setShowPassword={setShowPassword} onSubmit={auth} />
 
-  return <Dashboard user={user} workers={workers} selectedWorkerId={selectedWorkerId} page={page} property={property} tickets={tickets} moduleItems={moduleItems} rows={rows} active={active} todayRecord={todayRecord} shift={shift} from={from} to={to} loading={loading} busy={busy} error={error} notice={notice} onLogout={logout} onPageChange={setPage} onSelectWorker={setSelectedWorkerId} onCreateWorker={(name, employeeCode) => void createWorker(name, employeeCode)} onDeactivateWorker={(workerId) => void deactivateWorker(workerId)} onPunch={(action) => void punch(action)} onDismiss={dismissAlerts} onFromChange={setFrom} onToChange={setTo} onCreateTower={(name, floors) => void createTower(name, floors)} onUpdateProperty={details => void updateProperty(details)} onCreateUnit={unit => void createUnit(unit)} onCreateTicket={ticket => void createTicket(ticket)} onModuleCreate={(module,item)=>void createModuleItem(module,item)} onModuleAction={(module,action,item)=>void moduleAction(module,action,item)} />
+  return <Dashboard user={user} workers={workers} selectedWorkerId={selectedWorkerId} page={page} property={property} tickets={tickets} moduleItems={moduleItems} overviewWorkOrders={overviewWorkOrders} overviewAttendance={overviewAttendance} rows={rows} active={active} todayRecord={todayRecord} shift={shift} from={from} to={to} loading={loading} busy={busy} error={error} notice={notice} onLogout={logout} onPageChange={setPage} onSelectWorker={setSelectedWorkerId} onCreateWorker={(name, employeeCode) => void createWorker(name, employeeCode)} onDeactivateWorker={(workerId) => void deactivateWorker(workerId)} onPunch={(action) => void punch(action)} onDismiss={dismissAlerts} onFromChange={setFrom} onToChange={setTo} onCreateTower={(name, floors) => void createTower(name, floors)} onUpdateProperty={details => void updateProperty(details)} onCreateUnit={unit => void createUnit(unit)} onCreateTicket={ticket => void createTicket(ticket)} onModuleCreate={(module,item)=>void createModuleItem(module,item)} onModuleAction={(module,action,item)=>void moduleAction(module,action,item)} />
 }

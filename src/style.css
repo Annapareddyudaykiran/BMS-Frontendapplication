@@ -4,13 +4,9 @@
 /* Split welcome screen inspired by the supplied PrimeSpace reference. */
 .auth-shell{min-height:100vh;min-height:100svh;padding:12px;display:grid;grid-template-columns:minmax(0,1.2fr) minmax(455px,.8fr);gap:12px;background:#eaf0f8}
 .auth-visual{position:relative;isolation:isolate;overflow:hidden;min-height:calc(100vh - 24px);min-height:calc(100svh - 24px);border-radius:10px;color:#fff;padding:34px 6.2%;display:flex;flex-direction:column;justify-content:space-between;background:linear-gradient(115deg,#061b3a 0%,#0c3261 52%,#1b5590 100%)}
-.auth-visual:before{content:"";position:absolute;inset:0;z-index:-2;background:radial-gradient(ellipse at 82% 19%,#70b9f45a 0,transparent 35%),radial-gradient(ellipse at 53% 85%,#4ea6eb48 0,transparent 36%),linear-gradient(180deg,#071d3b1c 35%,#041630d9 100%)}
+.auth-visual:before{content:"";position:absolute;inset:0;z-index:-2;background-image:linear-gradient(180deg,#071d3b1c 35%,#041630d9 100%),radial-gradient(ellipse at 82% 19%,#70b9f45a 0,transparent 35%),url('/building-watermark.svg'),radial-gradient(ellipse at 53% 85%,#4ea6eb48 0,transparent 36%);background-repeat:no-repeat;background-size:100% 100%,100% 100%,min(82%,900px) 92%,100% 100%;background-position:center,center,right bottom,center}
 .auth-visual:after{content:"";position:absolute;z-index:-1;inset:0;background:linear-gradient(90deg,#0618313d 0%,transparent 65%),linear-gradient(0deg,#06152c78,transparent 28%);pointer-events:none}
 .visual-glow{position:absolute;z-index:-2;width:50vw;height:50vw;right:-17vw;top:-23vw;border-radius:50%;background:#68a9e21a;filter:blur(5px)}
-.visual-building{position:absolute;z-index:-1;bottom:0;border:1px solid #9bd0ff24;background:repeating-linear-gradient(0deg,transparent 0 24px,#b9dcff19 25px 27px),repeating-linear-gradient(90deg,#123a65 0 24px,#9ac9ef26 25px 27px),linear-gradient(120deg,#28619a,#092447);box-shadow:inset 0 0 32px #9dd0ff10,0 0 70px #5da7ed17;opacity:.78}
-.building-back{right:6%;width:29%;height:74%;clip-path:polygon(17% 0,100% 0,100% 100%,0 100%,0 18%)}
-.building-mid{right:31%;width:24%;height:53%;clip-path:polygon(0 0,82% 0,100% 100%,0 100%);opacity:.63}
-.building-front{right:-3%;width:29%;height:39%;clip-path:polygon(0 0,100% 12%,100% 100%,12% 100%);opacity:.72}
 .visual-top,.visual-copy,.visual-bottom{position:relative;z-index:1}
 .visual-top{display:flex;align-items:center;justify-content:space-between}
 .visual-logo{display:block;width:126px;height:126px;object-fit:contain;border-radius:16px;box-shadow:0 12px 30px #00132d55}
@@ -28,9 +24,8 @@
 .visual-features>div>span{width:43px;height:43px;border:1px solid #d6eaff81;border-radius:50%;display:grid;place-items:center;background:#ffffff10;color:#d9edff;box-shadow:inset 0 0 16px #ffffff0b}
 .visual-features small{font-size:10px;line-height:1.45;font-weight:500;color:#e1edfb}
 .visual-bottom{display:flex;justify-content:space-between;align-items:center;padding-top:17px;border-top:1px solid #ffffff26;color:#c1d4e9;font-size:10px}
-.visual-bottom>span:last-child{font-size:9px;font-weight:700;letter-spacing:1.7px}.visual-bottom b{color:#75adff;font-size:14px;margin-left:5px}
-.auth-main{min-width:0;display:flex;flex-direction:column;justify-content:center;align-items:center;padding:34px 7%;border-radius:10px;background:linear-gradient(145deg,#f4f7fc,#e8effa)}
-.auth-card{width:min(100%,450px);padding:40px 42px 30px;background:#fff;border:1px solid #e8edf4;border-radius:17px;box-shadow:0 20px 70px #17345c17}
+.auth-main{min-width:0;display:flex;flex-direction:column;justify-content:center;align-items:center;padding:28px 3%;border-radius:10px;background:linear-gradient(145deg,#f4f7fc,#e8effa)}
+.auth-card{width:min(100%,500px);padding:44px 48px 38px;background:#fff;border:1px solid #e8edf4;border-radius:17px;box-shadow:0 20px 70px #17345c17}
 .mobile-brand{display:none}
 .auth-eyebrow{margin:0 0 8px;color:#5269aa;font-size:9px;font-weight:700;letter-spacing:1.8px}
 .auth-card h2{margin:0;color:#102d5b;font:800 27px/1.25 Manrope,sans-serif;letter-spacing:-.8px}
@@ -51,11 +46,6 @@
 .auth-switch{display:flex;justify-content:center;align-items:center;gap:6px;margin:20px 0 22px;font-size:10px;color:#8390a6}
 .auth-switch button{border:0;background:transparent;color:#2456bb;font-weight:700;font-size:10px;padding:2px}
 .auth-switch button:hover{text-decoration:underline}
-.auth-divider{display:flex;align-items:center;gap:10px;color:#94a1b6}
-.auth-divider span{height:1px;flex:1;background:#e6ebf3}
-.auth-divider i{font-style:normal;font-size:7px;font-weight:700;letter-spacing:1.1px;white-space:nowrap}
-.auth-card .secure{margin:17px 0 0;padding:0;border:0;color:#7888a1;font-size:9px;gap:7px}
-.auth-card .secure svg{color:#31a783}
 .mobile-footer{display:none}
 @media(max-width:1050px){.auth-shell{grid-template-columns:minmax(0,1fr) minmax(400px,.9fr)}.auth-visual{padding-left:5%;padding-right:5%}.visual-features{gap:17px}.auth-card{padding:34px 32px 26px}}
 @media(max-width:760px){.auth-shell{display:flex;flex-direction:column;padding:9px;gap:9px}.auth-visual{min-height:310px;padding:22px 24px 18px}.visual-logo{width:103px;height:103px}.visual-tag{font-size:8px;letter-spacing:.8px}.visual-copy{margin:32px 0 25px}.visual-copy h1{font-size:clamp(38px,8vw,56px)}.visual-description{font-size:12px;margin:13px 0 18px}.visual-features{gap:18px}.visual-features>div>span{width:36px;height:36px}.visual-features>div>span svg{width:17px}.visual-features small{font-size:9px}.visual-bottom{padding-top:10px}.auth-main{padding:14px 12px 20px}.auth-card{max-width:500px;padding:29px 30px 23px}.mobile-footer{display:block;margin:15px 0 0;color:#7c8aa2;font-size:9px}.mobile-footer b{color:#4e60d2}.sidebar-brand-image{width:70px;height:70px;margin:0}}
@@ -102,10 +92,6 @@ aside{width:185px;background:#0b2f60;border-right:0;padding:20px 15px;color:#fff
 .module-stats b,.property-stats b{color:#123e73}
 .property-title h2,.property-title h3{color:#153d6c}
 .alert{font-size:12px}
-.auth-visual .visual-building{opacity:.22;border-color:#c6e2ff30;box-shadow:inset 0 0 32px #9dd0ff08,0 0 60px #5da7ed0c}
-.auth-visual .building-back{right:5%;width:29%;height:75%}
-.auth-visual .building-mid{right:28%;width:24%;height:54%}
-.auth-visual .building-front{right:-2%;width:26%;height:40%}
 .executive-overview{display:grid;gap:14px}
 .command-banner{min-height:134px;padding:24px 20px;border-radius:10px;background:linear-gradient(105deg,#103d78,#1c62ad);color:#fff;display:flex;align-items:flex-start;justify-content:space-between;flex-direction:column;gap:16px}
 .command-banner h2{margin:0;font-size:20px;color:#fff}
